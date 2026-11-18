@@ -80,6 +80,14 @@ Ein Passwort ist dafür nicht nötig.
 2. **Einstellungen → Control Plane → Integrations → API-Schlüssel erstellen**
 3. Schlüssel kopieren und beim Installations-Skript einfügen
 
+**Schlüssel nachtragen oder ändern:** In der Proxmox-Shell diese Zeile ausführen und den Schlüssel einfügen. Mehr ist nicht nötig:
+
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/berwaltphilipp-tech/Berwalt-Tech/HEAD/udm-key.sh)"
+```
+
+Das Skript prüft den Schlüssel direkt an der UDM, speichert ihn und startet das Dashboard neu. Ist er falsch, fragt es nochmal. Ohne Proxmox: im Dashboard-Ordner `sudo ./udm-key.sh`.
+
 **Alternative für ältere Firmware: lokaler Benutzer**
 
 1. In UniFi OS unter **Admins & Users** einen neuen Admin anlegen
@@ -123,7 +131,7 @@ Viele Dienste (Pi-hole, AdGuard, Jellyfin, Home Assistant …) können zusätzli
 | Proxmox-Kacheln zeigen *API-Fehler* | Installations-Skript nochmal ausführen (erneuert den Token) |
 | CPU-Temperatur zeigt `-` | Sensorname in `HOMEPAGE_VAR_CPU_SENSOR` anpassen. Alle Sensoren: `http://<PROXMOX-IP>:61208/api/4/sensors` |
 | FRITZ!Box-Kacheln zeigen *API-Fehler* | Die zwei Haken oben setzen und Skript nochmal ausführen |
-| UDM-Kachel zeigt *API-Fehler* | API-Schlüssel prüfen, in der `.env` bei `HOMEPAGE_VAR_UNIFI_KEY` korrigieren, dann `docker compose up -d --force-recreate homepage` |
+| UDM-Kachel zeigt *API-Fehler* | Schlüssel neu eintragen mit `udm-key.sh` (siehe [UDM freischalten](#udm-freischalten-für-das-heimnetz)) |
 | `apt-get update` meldet 401-Fehler | Enterprise-Repository ohne Abo. Stört das Skript nicht, sonst in Proxmox unter *Updates → Repositories* das „No-Subscription“-Repository aktivieren |
 
 Protokolle: im Container `cd /opt/berwalt-tech && docker compose logs -f homepage`, auf dem Host `journalctl -u glances`.
@@ -155,6 +163,7 @@ pveum user delete homepage@pve
 ```
 proxmox-install.sh   Einrichtung auf Proxmox (in der Proxmox-Shell ausführen)
 setup.sh             Einrichtung auf einem Linux-Server bzw. im Dashboard-LXC
+udm-key.sh           UDM-API-Schlüssel nachtragen oder ändern
 docker-compose.yml   Startet Dashboard und Docker-Proxy (Glances optional)
 .env.example         Vorlage für die Einstellungen (wird zu .env)
 config/

@@ -236,15 +236,16 @@ if [ -n "$FRITZ_HINT" ]; then
     [x] Statusinformationen über UPnP übertragen
 EOF
 fi
+if [ -n "$FRITZ_HINT" ]; then
+  echo
+  echo "  Danach einfach nochmal:  ${RERUN_HINT:-sudo ./setup.sh}"
+fi
 if [ -n "$UNIFI_HINT" ]; then
   cat <<EOF
 
   Noch zu tun in der UDM (https://$UNIFI):
     UniFi Network -> Einstellungen -> Control Plane -> Integrations -> API-Schlüssel erstellen
+    Dann eintragen mit:  ${UDM_KEY_HINT:-sudo ./udm-key.sh}
 EOF
-fi
-if [ -n "$FRITZ_HINT$UNIFI_HINT" ]; then
-  echo
-  echo "  Danach einfach nochmal:  ${RERUN_HINT:-sudo ./setup.sh}"
 fi
 echo

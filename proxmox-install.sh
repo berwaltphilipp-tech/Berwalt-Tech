@@ -21,6 +21,7 @@ CT_NAME=dashboard
 APP_DIR=/opt/berwalt-tech
 ICON_CDN=https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg
 ONE_LINER='bash -c "$(curl -fsSL https://raw.githubusercontent.com/berwaltphilipp-tech/Berwalt-Tech/HEAD/proxmox-install.sh)"'
+UDM_KEY_LINER='bash -c "$(curl -fsSL https://raw.githubusercontent.com/berwaltphilipp-tech/Berwalt-Tech/HEAD/udm-key.sh)"'
 
 say()  { printf '\n\033[1;36m==> %s\033[0m\n' "$*"; }
 ok()   { printf '\033[32m  ✓ %s\033[0m\n' "$*"; }
@@ -260,6 +261,7 @@ ENVF=$TMP/dashboard-install.env
   printf 'PVE_TOKEN_SECRET=%q\n' "$TOKEN_SECRET"
   printf 'GUESTS_FILE=%q\n' "/root/proxmox-gaeste.yaml"
   printf 'RERUN_HINT=%q\n' "$ONE_LINER (in der Proxmox-Shell)"
+  printf 'UDM_KEY_HINT=%q\n' "$UDM_KEY_LINER (in der Proxmox-Shell)"
   [ -n "$UNIFI_KEY" ] && printf 'UNIFI_KEY=%q\n' "$UNIFI_KEY"
   [ -n "${FRITZBOX_IP:-}" ] && printf 'FRITZBOX_IP=%q\n' "$FRITZBOX_IP"
   [ -n "${UNIFI_IP:-}" ] && printf 'UNIFI_IP=%q\n' "$UNIFI_IP"
