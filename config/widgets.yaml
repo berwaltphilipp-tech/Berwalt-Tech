@@ -9,7 +9,8 @@
     mem: true
     cputemp: true
     uptime: true
-    disk: "{{HOMEPAGE_VAR_ROOTFS}}" # Systemlaufwerk des Servers
+    # Kein "disk" hier: das wäre nur die ~100-GB-Systempartition von Proxmox.
+    # Alle Speicher stehen in den Kacheln "Speicher frei/belegt".
     expanded: true
 
 - datetime:

@@ -82,22 +82,6 @@
           version: 4
           metric: "disk:{{HOMEPAGE_VAR_DISK}}"
 
-    - Speicherplatz:
-        icon: mdi-database
-        widget:
-          type: glances
-          url: "{{HOMEPAGE_VAR_GLANCES_URL}}"
-          version: 4
-          metric: "fs:{{HOMEPAGE_VAR_ROOTFS}}"
-
-    - Top-Prozesse:
-        icon: mdi-format-list-numbered
-        widget:
-          type: glances
-          url: "{{HOMEPAGE_VAR_GLANCES_URL}}"
-          version: 4
-          metric: process
-
     - System:
         icon: mdi-information-outline
         widget:
@@ -116,6 +100,45 @@
           username: "{{HOMEPAGE_VAR_PVE_TOKEN_ID}}"
           password: "{{HOMEPAGE_VAR_PVE_TOKEN_SECRET}}"
           node: "{{HOMEPAGE_VAR_PVE_NODE}}"
+
+    # Alle Speicher aus Proxmox (local, local-lvm, ZFS, NAS ...), direkt über die
+    # Proxmox-API. Der Token wird nur vom Dashboard-Server benutzt, nie im Browser.
+    - Speicher frei:
+        icon: mdi-database-check
+        href: "{{HOMEPAGE_VAR_PVE_URL}}"
+        description: Alle Proxmox-Speicher
+        widget:
+          type: customapi
+          url: "{{HOMEPAGE_VAR_PVE_URL}}/api2/json/nodes/{{HOMEPAGE_VAR_PVE_NODE}}/storage?enabled=1"
+          headers:
+            Authorization: "PVEAPIToken={{HOMEPAGE_VAR_PVE_TOKEN_ID}}={{HOMEPAGE_VAR_PVE_TOKEN_SECRET}}"
+          refreshInterval: 60000
+          display: dynamic-list
+          mappings:
+            items: data
+            name: storage
+            label: avail
+            format: bytes
+            suffix: frei
+
+    - Speicher belegt:
+        icon: mdi-database-alert
+        href: "{{HOMEPAGE_VAR_PVE_URL}}"
+        description: Belegung je Speicher
+        widget:
+          type: customapi
+          url: "{{HOMEPAGE_VAR_PVE_URL}}/api2/json/nodes/{{HOMEPAGE_VAR_PVE_NODE}}/storage?enabled=1"
+          headers:
+            Authorization: "PVEAPIToken={{HOMEPAGE_VAR_PVE_TOKEN_ID}}={{HOMEPAGE_VAR_PVE_TOKEN_SECRET}}"
+          refreshInterval: 60000
+          display: dynamic-list
+          mappings:
+            items: data
+            name: storage
+            label: used_fraction
+            format: percent
+            scale: 100
+            suffix: belegt
 
 # --- Alle VMs und LXC-Container von Proxmox ----------------------------------
 # Der Block zwischen den Markierungen wird von proxmox-install.sh automatisch
