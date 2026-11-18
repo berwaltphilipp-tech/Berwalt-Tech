@@ -196,14 +196,125 @@ ok "Dashboard-Dateien in $APP_DIR"
 
 # ------------------------------------------------------------------------------
 say "5/5  Kacheln für alle VMs und Container erzeugen"
+# Ziel: Ein Klick auf eine Kachel öffnet das Programm in der VM/im LXC,
+# nicht die VM in Proxmox. Reihenfolge, um die Adresse zu finden:
+#   1. Notiz in Proxmox mit einer Zeile "dashboard: http://IP:PORT"
+#   2. automatisch: IP des Gasts ermitteln und den Web-Port des Programms suchen
+#   3. zuletzt gefundene Adresse (falls der Gast gerade aus ist)
+#   4. sonst: öffnet den Gast in Proxmox
 GUESTS=$TMP/proxmox-gaeste.yaml
-{ qm list 2>/dev/null | awk 'NR > 1 { print $1, "qemu", $2 }'
-  pct list 2>/dev/null | awk 'NR > 1 { print $1, "lxc", $NF }'
+STATE_DIR=/etc/berwalt-dashboard
+mkdir -p "$STATE_DIR"
+CACHE=$STATE_DIR/gast-adressen
+touch "$CACHE"
+: > "$TMP/cache.new"
+NET_BASE=${HOST_IP%.*}
+HOST_CIDR=$(ip -4 -o addr show dev "$IFACE" 2>/dev/null | awk '{ print $4 }' | head -1 || true)
+
+{ qm list 2>/dev/null | awk 'NR > 1 { print $1, "qemu", $3, $2 }'
+  pct list 2>/dev/null | awk 'NR > 1 { print $1, "lxc", $2, $NF }'
 } | sort -n > "$TMP/guests.txt"
+
+# Aus einer Liste von IPs (eine pro Zeile) die passende wählen: bevorzugt das
+# Heimnetz des Hosts, keine Loopback-/Docker-internen Adressen.
+pick_ip() {
+  local ips
+  ips=$(grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | grep -vE '^(127\.|169\.254\.|172\.(1[7-9]|2[0-9]|3[01])\.)' || true)
+  [ -n "$ips" ] || return 0
+  grep -m1 -F "$NET_BASE." <<<"$ips" || head -1 <<<"$ips"
+}
+
+guest_ip() {  # $1 = ID, $2 = qemu|lxc
+  local id=$1 type=$2 ip="" mac
+  if [ "$type" = lxc ]; then
+    lxc-info -n "$id" -iH </dev/null 2>/dev/null | pick_ip
+    return 0
+  fi
+  if qm config "$id" </dev/null 2>/dev/null | grep -qE '^agent: *(1|enabled=1)'; then
+    ip=$(timeout 8 qm guest cmd "$id" network-get-interfaces </dev/null 2>/dev/null \
+      | grep -oE '"ip-address" *: *"[0-9.]+"' | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | pick_ip || true)
+  fi
+  if [ -z "$ip" ]; then  # ohne Gast-Agent: MAC-Adresse der VM in der ARP-Tabelle des Hosts suchen
+    mac=$(qm config "$id" </dev/null 2>/dev/null | grep -E '^net[0-9]+:' | grep -oiE '([0-9a-f]{2}:){5}[0-9a-f]{2}' | head -1 || true)
+    [ -n "$mac" ] && ip=$(ip -4 neigh show 2>/dev/null | grep -i " $mac " | awk '{ print $1 }' | pick_ip || true)
+  fi
+  printf '%s' "$ip"
+}
+
+# Sucht die Weboberfläche: zuerst die bekannten Ports des Programms, dann übliche Web-Ports.
+probe_url() {  # $1 = IP, $2 = Programmname
+  local ip=$1 cands="" c proto rest port path code code2 url
+  case "$2" in
+    home-assistant) cands="http:8123 https:8123" ;;
+    jellyfin|emby) cands="http:8096 https:8920" ;;
+    plex) cands="http:32400/web" ;;
+    pi-hole) cands="http:80/admin https:443/admin" ;;
+    adguard-home) cands="http:80 http:3000" ;;
+    nextcloud|vaultwarden|truenas|openmediavault|omv) cands="https:443 http:80" ;;
+    immich) cands="http:2283" ;;
+    paperless*) cands="http:8000" ;;
+    portainer|docker*) cands="https:9443 http:9000" ;;
+    nginx-proxy-manager) cands="http:81" ;;
+    uptime-kuma|uptimekuma) cands="http:3001" ;;
+    grafana|gitea|forgejo) cands="http:3000" ;;
+    proxmox-backup-server) cands="https:8007" ;;
+    frigate) cands="http:5000 https:8971" ;;
+    node-red|nodered) cands="http:1880" ;;
+    n8n) cands="http:5678" ;;
+    zigbee2mqtt) cands="http:8080" ;;
+    esphome) cands="http:6052" ;;
+    audiobookshelf) cands="http:13378 http:80" ;;
+    sonarr) cands="http:8989" ;;
+    radarr) cands="http:7878" ;;
+    prowlarr) cands="http:9696" ;;
+    lidarr) cands="http:8686" ;;
+    bazarr) cands="http:6767" ;;
+    readarr) cands="http:8787" ;;
+    qbittorrent) cands="http:8090 http:8080" ;;
+    sabnzbd) cands="http:7777 http:8080" ;;
+    overseerr|jellyseerr) cands="http:5055" ;;
+    tautulli) cands="http:8181" ;;
+    syncthing) cands="http:8384" ;;
+    homarr) cands="http:7575" ;;
+    unifi*) cands="https:8443" ;;
+    omada) cands="https:8043" ;;
+    cockpit) cands="https:9090" ;;
+    dashboard) cands="http:3000" ;;
+  esac
+  for c in $cands http:80 https:443 http:8080 https:8443 http:3000 http:8000 http:5000 http:9000 https:9443 http:8081; do
+    proto=${c%%:*}; rest=${c#*:}; port=${rest%%/*}; path=""
+    [ "$rest" != "$port" ] && path="/${rest#*/}"
+    code=$(curl --noproxy '*' -sk -o /dev/null --connect-timeout 2 -m 4 -w '%{http_code}' "$proto://$ip:$port$path" 2>/dev/null || true)
+    if [ "$proto" = http ] && [ "$code" = 400 ]; then  # Antwort "400" auf HTTP: oft ein HTTPS-Port
+      code2=$(curl --noproxy '*' -sk -o /dev/null --connect-timeout 2 -m 4 -w '%{http_code}' "https://$ip:$port$path" 2>/dev/null || true)
+      [ -n "$code2" ] && [ "$code2" != 000 ] && proto=https && code=$code2
+    fi
+    if [ -n "$code" ] && [ "$code" != 000 ]; then
+      url="$proto://$ip"
+      case "$proto:$port" in http:80|https:443) ;; *) url="$url:$port" ;; esac
+      printf '%s' "$url$path"
+      return 0
+    fi
+  done
+}
+
+notes_url() {  # $1 = ID, $2 = qemu|lxc -> Adresse aus der Proxmox-Notiz ("dashboard: http://...")
+  pvesh get "/nodes/$NODE/$2/$1/config" --output-format json </dev/null 2>/dev/null \
+    | grep -oiE 'dashboard: *https?://[^" \\<]+' | head -1 | sed -E 's/^[^:]+: *//' || true
+}
+
+# VMs ohne Gast-Agent findet man über die ARP-Tabelle; ein kurzer Ping an das
+# Heimnetz (/24) füllt sie, falls nötig.
+if grep -q ' qemu running ' "$TMP/guests.txt" && command -v ping >/dev/null && [ "${HOST_CIDR#*/}" = 24 ]; then
+  for i in $(seq 1 254); do ping -c1 -W1 "$NET_BASE.$i" >/dev/null 2>&1 & done
+  wait
+fi
+
 count=0
 seen=" "
 : > "$GUESTS"
-while read -r id type name; do
+: > "$TMP/report.txt"
+while read -r id type state name <&3; do
   [ -n "$id" ] || continue
   [ "$count" -eq 0 ] && echo "- Proxmox-Gäste:" >> "$GUESTS"
   count=$((count + 1))
@@ -211,7 +322,7 @@ while read -r id type name; do
   case "$seen" in *" $name "*) label="$name ($id)" ;; esac
   seen="$seen$name "
   lname=$(tr '[:upper:]' '[:lower:]' <<<"$name")
-  case "$lname" in  # übliche Kurznamen -> Icon-Name
+  case "$lname" in  # übliche Kurznamen -> Programm-/Icon-Name
     homeassistant|hass|haos) lname=home-assistant ;;
     pihole) lname=pi-hole ;;
     adguard|adguardhome) lname=adguard-home ;;
@@ -227,17 +338,52 @@ while read -r id type name; do
     icon=mdi-cube-outline
   fi
   if [ "$type" = qemu ]; then kind=VM; else kind=LXC; fi
+
+  url=$(notes_url "$id" "$type"); how="aus der Proxmox-Notiz"
+  if [ -z "$url" ] && [ "$id" = "$CTID" ]; then  # das Dashboard selbst
+    url="http://$CT_IP:3000"; how="dieses Dashboard"
+  fi
+  if [ -z "$url" ] && [ "$state" = running ]; then
+    gip=$(guest_ip "$id" "$type")
+    if [ -n "$gip" ]; then url=$(probe_url "$gip" "$lname"); how="automatisch gefunden"; fi
+  fi
+  if [ -z "$url" ]; then
+    url=$(awk -v id="$id" '$1 == id { print $2 }' "$CACHE"); how="zuletzt gefunden"
+  fi
+
+  if [ -n "$url" ]; then
+    echo "$id $url" >> "$TMP/cache.new"
+    href=$url
+    desc="${url#*://}"
+    printf '  ✓ %-20s → %s (%s)\n' "$label" "$url" "$how" >> "$TMP/report.txt"
+  else
+    href="https://$HOST_IP:8006/#v1:0:=$type%2F$id"
+    desc="$kind $id"
+    if [ "$state" = running ]; then
+      printf '  ! %-20s → keine Weboberfläche gefunden, öffnet Proxmox\n' "$label" >> "$TMP/report.txt"
+    else
+      printf '  - %-20s → ist aus, öffnet Proxmox\n' "$label" >> "$TMP/report.txt"
+    fi
+  fi
   cat >> "$GUESTS" <<EOF
     - "$label":
         icon: $icon
-        href: "https://$HOST_IP:8006/#v1:0:=$type%2F$id"
-        description: "$kind $id"
+        href: "$href"
+        description: "$desc"
         proxmoxNode: "$NODE"
         proxmoxVMID: $id
         proxmoxType: $type
 EOF
-done < "$TMP/guests.txt"
-ok "$count VMs/Container gefunden"
+done 3< "$TMP/guests.txt"
+mv "$TMP/cache.new" "$CACHE"
+ok "$count VMs/Container gefunden:"
+cat "$TMP/report.txt"
+if grep -q '^  [!-]' "$TMP/report.txt"; then
+  echo
+  echo "  Adresse von Hand festlegen: In Proxmox die VM/den LXC anklicken -> Übersicht ->"
+  echo "  Notizen -> eine Zeile wie  dashboard: http://192.168.1.20:8123  eintragen,"
+  echo "  dann dieses Skript nochmal ausführen."
+fi
 
 # UDM-Schlüssel nur abfragen, wenn im Dashboard noch keiner hinterlegt ist
 UNIFI_KEY=${UNIFI_KEY:-}
