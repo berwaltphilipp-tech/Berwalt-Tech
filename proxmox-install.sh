@@ -206,7 +206,8 @@ GUESTS=$TMP/proxmox-gaeste.yaml
 STATE_DIR=/etc/berwalt-dashboard
 mkdir -p "$STATE_DIR"
 CACHE=$STATE_DIR/gast-adressen
-touch "$CACHE"
+IPS=$STATE_DIR/gast-ips  # von Hand eingegebene IPs ("-" = nicht mehr fragen)
+touch "$CACHE" "$IPS"
 : > "$TMP/cache.new"
 NET_BASE=${HOST_IP%.*}
 HOST_CIDR=$(ip -4 -o addr show dev "$IFACE" 2>/dev/null | awk '{ print $4 }' | head -1 || true)
@@ -300,9 +301,19 @@ probe_url() {  # $1 = IP, $2 = Programmname
   done
 }
 
-notes_url() {  # $1 = ID, $2 = qemu|lxc -> Adresse aus der Proxmox-Notiz ("dashboard: http://...")
+# $1 = ID, $2 = qemu|lxc -> Eintrag aus der Proxmox-Notiz: "dashboard: http://..."
+# oder "dashboard: 192.168.1.20" (dann wird dort die Weboberfläche gesucht)
+notes_value() {
   pvesh get "/nodes/$NODE/$2/$1/config" --output-format json </dev/null 2>/dev/null \
-    | grep -oiE 'dashboard: *https?://[^" \\<]+' | head -1 | sed -E 's/^[^:]+: *//' || true
+    | grep -oiE 'dashboard: *(https?://[^" \\<]+|[0-9]+(\.[0-9]+){3}(:[0-9]+)?)' | head -1 | sed -E 's/^[^:]+: *//' || true
+}
+ask() {  # sichtbare Eingabe, leer ohne Terminal
+  local answer=""
+  if [ -n "$HAVE_TTY" ]; then
+    printf '  %s: ' "$1" >/dev/tty
+    read -r answer </dev/tty || true
+  fi
+  printf '%s' "$answer"
 }
 
 # VMs ohne Gast-Agent findet man über die ARP-Tabelle; ein kurzer Ping an das
@@ -341,8 +352,13 @@ while read -r id type state name <&3; do
   fi
   if [ "$type" = qemu ]; then kind=VM; else kind=LXC; fi
 
-  gip="" desc=""
-  url=$(notes_url "$id" "$type"); how="aus der Proxmox-Notiz"
+  gip="" desc="" url="" how=""
+  note=$(notes_value "$id" "$type")
+  case "$note" in
+    http://*|https://*) url=$note; how="aus der Proxmox-Notiz" ;;
+    *:*) url="http://$note"; how="aus der Proxmox-Notiz" ;;
+    ?*) gip=$note; how="IP aus der Proxmox-Notiz" ;;  # nur IP: Weboberfläche dort suchen
+  esac
   if [ -z "$url" ] && [ "$id" = "$CTID" ]; then  # das Dashboard selbst
     url="http://$CT_IP:3000"; how="dieses Dashboard"
   fi
@@ -352,11 +368,31 @@ while read -r id type state name <&3; do
       cloudflared*|cloudflare*) url="https://one.dash.cloudflare.com/"; desc="Verwaltung bei Cloudflare" ;;
       netbird*) url="https://app.netbird.io/"; desc="Verwaltung bei NetBird" ;;
     esac
-    how="Online-Verwaltung"
+    [ -n "$url" ] && how="Online-Verwaltung"
   fi
   if [ -z "$url" ] && [ "$state" = running ]; then
-    gip=$(guest_ip "$id" "$type")
-    if [ -n "$gip" ]; then url=$(probe_url "$gip" "$lname"); how="automatisch gefunden"; fi
+    [ -n "$gip" ] || gip=$(guest_ip "$id" "$type")
+    if [ -z "$gip" ]; then  # nicht automatisch gefunden: gespeicherte oder erfragte IP
+      saved=$(awk -v id="$id" '$1 == id { print $2 }' "$IPS" | tail -1 || true)
+      if [ -n "$saved" ] && [ "$saved" != "-" ]; then
+        gip=$saved
+      elif [ -z "$saved" ] && [ -n "$HAVE_TTY" ]; then
+        [ -n "${ASKED:-}" ] || { echo; echo "  Bei diesen Gästen wurde keine IP-Adresse gefunden. Du kannst sie hier eintragen:"; ASKED=1; }
+        answer=$(ask "IP-Adresse von $label ($kind $id), leer = nicht mehr fragen")
+        answer=$(tr -d '[:space:]' <<<"$answer")
+        if [[ "$answer" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          gip=$answer
+          echo "$id $answer" >> "$IPS"
+        else
+          [ -n "$answer" ] && warn "\"$answer\" ist keine IP-Adresse, übersprungen"
+          echo "$id -" >> "$IPS"
+        fi
+      fi
+      [ -n "$gip" ] && how="von Hand eingetragene IP"
+    fi
+    if [ -n "$gip" ]; then url=$(probe_url "$gip" "$lname"); how=${how:-automatisch gefunden}; fi
+  else
+    gip=""  # Gast ist aus: nichts zu prüfen, gespeicherte Adresse verwenden
   fi
   # Gespeicherte Adresse nur, wenn gerade nichts geprüft werden konnte (Gast aus
   # oder IP unbekannt); läuft der Gast und hat keine Weboberfläche, gilt sie nicht mehr.
@@ -398,8 +434,9 @@ cat "$TMP/report.txt"
 if grep -q '^  [!-]' "$TMP/report.txt"; then
   echo
   echo "  Adresse von Hand festlegen: In Proxmox die VM/den LXC anklicken -> Übersicht ->"
-  echo "  Notizen -> eine Zeile wie  dashboard: http://192.168.1.20:8123  eintragen,"
-  echo "  dann dieses Skript nochmal ausführen."
+  echo "  Notizen -> eine Zeile wie  dashboard: http://192.168.1.20:8123  (oder nur"
+  echo "  dashboard: 192.168.1.20) eintragen, dann dieses Skript nochmal ausführen."
+  echo "  Übersprungene IP-Fragen kommen wieder, wenn du $IPS löschst."
   if grep -q 'Gast-Agent fehlt' "$TMP/report.txt"; then
     echo
     echo "  VMs ohne IP: In der VM den Gast-Agenten installieren (Debian/Ubuntu:"
