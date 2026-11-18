@@ -1,0 +1,155 @@
+---
+# Kacheln des Dashboards. Alle Optionen: https://gethomepage.dev/configs/services/
+# Platzhalter wie {{HOMEPAGE_VAR_...}} werden aus der Datei .env gefüllt.
+#
+# Netz-Aufbau:  Internet -> FRITZ!Box 6690 -> UDM -> Heimnetz (Server, Geräte)
+
+# --- Internet-Traffic rein / raus und Heimnetz ------------------------------
+- Internet & Heimnetz:
+    - Internet-Traffic:
+        icon: fritzbox.svg
+        href: "{{HOMEPAGE_VAR_FRITZBOX_URL}}"
+        description: Alles, was über die FRITZ!Box rein- und rausgeht
+        widget:
+          type: fritzbox
+          url: "{{HOMEPAGE_VAR_FRITZBOX_URL}}"
+          fields: ["down", "up", "received", "sent"]
+
+    - Internet-Verbindung:
+        icon: mdi-web
+        href: "{{HOMEPAGE_VAR_FRITZBOX_URL}}"
+        description: Leitung der FRITZ!Box 6690
+        widget:
+          type: fritzbox
+          url: "{{HOMEPAGE_VAR_FRITZBOX_URL}}"
+          fields: ["connectionStatus", "uptime", "maxDown", "maxUp"]
+
+    - Heimnetz (UDM):
+        icon: ubiquiti-unifi.svg
+        href: "{{HOMEPAGE_VAR_UNIFI_URL}}"
+        description: Geräte in LAN und WLAN
+        widget:
+          type: unifi
+          url: "{{HOMEPAGE_VAR_UNIFI_URL}}"
+          key: "{{HOMEPAGE_VAR_UNIFI_KEY}}"
+          username: "{{HOMEPAGE_VAR_UNIFI_USER}}"
+          password: "{{HOMEPAGE_VAR_UNIFI_PASS}}"
+          # "wan" absichtlich weggelassen: Homepage übersetzt den Status auf Deutsch
+          # falsch ("Gesendet"/"EMPFANGEN" statt Online/Offline). Den Internet-Status
+          # zeigt die Kachel "Internet-Verbindung" korrekt an.
+          fields: ["uptime", "lan_users", "wlan_users"]
+
+# --- Live-Diagramme zum Server: Leistung und eigener Traffic -----------------
+- Server:
+    - CPU-Auslastung:
+        icon: mdi-cpu-64-bit
+        widget:
+          type: glances
+          url: "{{HOMEPAGE_VAR_GLANCES_URL}}"
+          version: 4
+          metric: cpu
+          chartMax: 100
+
+    - Arbeitsspeicher (RAM):
+        icon: mdi-memory
+        widget:
+          type: glances
+          url: "{{HOMEPAGE_VAR_GLANCES_URL}}"
+          version: 4
+          metric: memory
+
+    - Server-Traffic:
+        icon: mdi-swap-vertical
+        widget:
+          type: glances
+          url: "{{HOMEPAGE_VAR_GLANCES_URL}}"
+          version: 4
+          metric: "network:{{HOMEPAGE_VAR_NET_IFACE}}"
+
+    - CPU-Temperatur:
+        icon: mdi-thermometer
+        widget:
+          type: glances
+          url: "{{HOMEPAGE_VAR_GLANCES_URL}}"
+          version: 4
+          metric: "sensor:{{HOMEPAGE_VAR_CPU_SENSOR}}"
+
+    - Festplatte lesen/schreiben:
+        icon: mdi-harddisk
+        widget:
+          type: glances
+          url: "{{HOMEPAGE_VAR_GLANCES_URL}}"
+          version: 4
+          metric: "disk:{{HOMEPAGE_VAR_DISK}}"
+
+    - Speicherplatz:
+        icon: mdi-database
+        widget:
+          type: glances
+          url: "{{HOMEPAGE_VAR_GLANCES_URL}}"
+          version: 4
+          metric: "fs:/rootfs" # = "/" des Servers
+
+    - Top-Prozesse:
+        icon: mdi-format-list-numbered
+        widget:
+          type: glances
+          url: "{{HOMEPAGE_VAR_GLANCES_URL}}"
+          version: 4
+          metric: process
+
+    - Docker-Container:
+        icon: mdi-docker
+        widget:
+          type: glances
+          url: "{{HOMEPAGE_VAR_GLANCES_URL}}"
+          version: 4
+          metric: containers
+
+    - System:
+        icon: mdi-information-outline
+        widget:
+          type: glances
+          url: "{{HOMEPAGE_VAR_GLANCES_URL}}"
+          version: 4
+          metric: info
+
+# --- Deine Dienste: ein Klick auf die Kachel öffnet den Dienst ---------------
+- Meine Dienste:
+    - FRITZ!Box:
+        icon: fritzbox.svg
+        href: "{{HOMEPAGE_VAR_FRITZBOX_URL}}"
+        description: Internet-Router
+        siteMonitor: "{{HOMEPAGE_VAR_FRITZBOX_URL}}"
+
+    - UniFi:
+        icon: ubiquiti-unifi.svg
+        href: "{{HOMEPAGE_VAR_UNIFI_URL}}"
+        description: "UDM: Geräte, WLAN, Traffic je Gerät"
+        siteMonitor: "{{HOMEPAGE_VAR_UNIFI_URL}}"
+
+    - Glances:
+        icon: glances.svg
+        href: "http://{{HOMEPAGE_VAR_SERVER_IP}}:61208"
+        description: Alle Server-Messwerte im Detail
+        server: lokal
+        container: glances
+
+    # ---------------------------------------------------------------------
+    # Vorlage für weitere Dienste: Block kopieren, "#" entfernen, anpassen.
+    #   icon:       Name von https://dashboardicons.com (z. B. jellyfin.svg)
+    #   href:       Adresse, die beim Klick geöffnet wird
+    #   container:  Name des Docker-Containers (zeigt Status + CPU/RAM/Traffic)
+    # ---------------------------------------------------------------------
+    # - Portainer:
+    #     icon: portainer.svg
+    #     href: "http://{{HOMEPAGE_VAR_SERVER_IP}}:9443"
+    #     description: Docker verwalten
+    #     server: lokal
+    #     container: portainer
+    #
+    # - Home Assistant:
+    #     icon: home-assistant.svg
+    #     href: "http://{{HOMEPAGE_VAR_SERVER_IP}}:8123"
+    #     description: Smart Home
+    #     siteMonitor: "http://{{HOMEPAGE_VAR_SERVER_IP}}:8123"

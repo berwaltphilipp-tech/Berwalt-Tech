@@ -1,0 +1,25 @@
+---
+# Leiste ganz oben. Alle Optionen: https://gethomepage.dev/widgets/
+
+- glances:
+    url: "{{HOMEPAGE_VAR_GLANCES_URL}}"
+    version: 4
+    label: Server
+    cpu: true
+    mem: true
+    cputemp: true
+    uptime: true
+    disk: /rootfs # = "/" des Servers (siehe docker-compose.yml)
+    expanded: true
+
+- datetime:
+    text_size: xl
+    locale: de-DE
+    format:
+      dateStyle: full
+      timeStyle: short
+      hourCycle: h23
+
+- search:
+    provider: duckduckgo
+    target: _blank

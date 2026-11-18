@@ -1,0 +1,8 @@
+---
+# Verbindung zu Docker (nur lesend, über den dockerproxy-Container).
+# Der Name "lokal" wird in services.yaml bei "server: lokal" verwendet.
+# Mehr: https://gethomepage.dev/configs/docker/
+
+lokal:
+  host: dockerproxy
+  port: 2375
