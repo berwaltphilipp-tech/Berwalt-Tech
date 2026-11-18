@@ -5,9 +5,9 @@ Auf einer Seite siehst du:
 
 | Bereich | Was du siehst |
 |---|---|
-| **Leiste oben** | CPU-Last, RAM, freier Speicher, CPU-Temperatur, Betriebszeit des Proxmox-Servers, Datum/Uhrzeit, Suche |
+| **Leiste oben** | CPU-Last, RAM, CPU-Temperatur, Betriebszeit des Proxmox-Servers, Datum/Uhrzeit, Suche |
 | **Internet & Heimnetz** | Internet-Traffic rein/raus (aktuell und gesamt) und Leitungsstatus von der FRITZ!Box, Betriebszeit und Anzahl der Geräte in LAN/WLAN von der UDM |
-| **Server** | Live-Diagramme für CPU, RAM und Netzwerk-Traffic des Proxmox-Servers, Temperatur, Festplatte (Lesen/Schreiben, Speicherplatz), Top-5-Prozesse, Systeminfo, laufende VMs/LXCs |
+| **Server** | Live-Diagramme für CPU, RAM und Netzwerk-Traffic des Proxmox-Servers, Temperatur, Festplatte (Lesen/Schreiben), Systeminfo, laufende VMs/LXCs, **alle Proxmox-Speicher** (local, local-lvm, ZFS, NAS …) mit freiem Platz und Belegung |
 | **Proxmox-Gäste** | Eine Kachel pro VM und LXC mit Status, CPU und RAM, wird automatisch erzeugt |
 | **Meine Dienste** | Proxmox, FRITZ!Box, UniFi, Glances und deine eigenen Dienste: Klick öffnet sie, grüner Punkt = erreichbar |
 
