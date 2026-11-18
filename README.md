@@ -32,6 +32,26 @@ Die FRITZ!Box sieht jedes Byte, das ins Internet geht oder von dort kommt, desha
 
 ## Installation
 
+### Schnellstart (empfohlen)
+
+Auf dem Server diese Zeile ausführen:
+
+```bash
+git clone https://github.com/berwaltphilipp-tech/Berwalt-Tech.git && cd Berwalt-Tech && sudo ./setup.sh
+```
+
+Das Skript `setup.sh` erledigt alles Weitere selbst:
+
+- installiert Docker, falls es fehlt
+- erkennt Server-IP, Netzwerkkarte, Festplatte, UDM und CPU-Temperatursensor
+- prüft, ob die FRITZ!Box Traffic-Daten liefert und ob der UDM-Schlüssel funktioniert
+- fragt nach dem UDM-API-Schlüssel (Eingabe bleibt unsichtbar)
+- schreibt die `.env` (nur für root lesbar) und startet das Dashboard
+
+Am Ende zeigt es die Adresse des Dashboards und, falls nötig, was in FRITZ!Box oder UDM noch freizuschalten ist. Danach einfach `sudo ./setup.sh` erneut ausführen. Das Skript lässt sich beliebig oft starten.
+
+### Von Hand
+
 1. Repository auf den Server holen:
    ```bash
    git clone https://github.com/berwaltphilipp-tech/Berwalt-Tech.git
@@ -132,6 +152,7 @@ Protokolle ansehen: `docker compose logs -f homepage`
 ## Dateien
 
 ```
+setup.sh             Richtet alles automatisch ein (sudo ./setup.sh)
 docker-compose.yml   Startet Dashboard, Glances und Docker-Proxy
 .env.example         Vorlage für deine Einstellungen (wird zu .env)
 config/
