@@ -98,8 +98,9 @@ Das Skript prüft den Schlüssel direkt an der UDM, speichert ihn und startet da
 
 Ein Klick auf eine VM- oder LXC-Kachel öffnet direkt das Programm darin. Das Skript findet die Adresse so:
 
-1. **Notiz in Proxmox:** Steht bei der VM/dem LXC unter *Übersicht → Notizen* eine Zeile wie `dashboard: http://192.168.1.20:8123`, wird genau diese Adresse benutzt.
+1. **Notiz in Proxmox:** Steht bei der VM/dem LXC unter *Übersicht → Notizen* eine Zeile wie `dashboard: http://192.168.1.20:8123`, wird genau diese Adresse benutzt. Mit nur einer IP (`dashboard: 192.168.1.20`) sucht das Skript dort selbst die Weboberfläche.
 2. **Automatisch:** Es ermittelt die IP-Adresse (bei LXCs direkt, bei VMs über den QEMU-Gast-Agenten oder die MAC-Adresse) und sucht die Weboberfläche. Für über 40 bekannte Programme kennt es den Port (Home Assistant 8123, Jellyfin 8096, Plex, Pi-hole, Nextcloud, Immich, Paperless, Portainer, Proxmox Backup Server, *arr, …). Sonst probiert es die üblichen Web-Ports. Der Name der VM/des LXC hilft dabei, z. B. `homeassistant` oder `jellyfin`.
+   Findet es die IP nicht, **fragt es dich beim Ausführen danach** und merkt sie sich. Leer lassen heißt „nicht mehr fragen“. Die Fragen kommen wieder, wenn du `/etc/berwalt-dashboard/gast-ips` auf dem Proxmox-Host löschst.
 3. **Zuletzt gefunden:** Ist eine VM gerade aus, bleibt die zuletzt gefundene Adresse erhalten.
 4. Findet es nichts, öffnet die Kachel die VM in Proxmox.
 
