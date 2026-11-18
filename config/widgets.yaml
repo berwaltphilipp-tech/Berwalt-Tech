@@ -9,7 +9,7 @@
     mem: true
     cputemp: true
     uptime: true
-    disk: /rootfs # = "/" des Servers (siehe docker-compose.yml)
+    disk: "{{HOMEPAGE_VAR_ROOTFS}}" # Systemlaufwerk des Servers
     expanded: true
 
 - datetime:

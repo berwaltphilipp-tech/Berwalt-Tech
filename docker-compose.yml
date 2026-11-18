@@ -16,19 +16,20 @@ services:
     volumes:
       - ./config:/app/config
       - ./images:/app/public/images
-    extra_hosts:
-      # damit das Dashboard Glances (läuft im Host-Netz) erreicht
-      - "host.docker.internal:host-gateway"
     depends_on:
       - dockerproxy
-      - glances
 
   # Misst CPU, RAM, Temperatur, Festplatten und den Netzwerk-Traffic des Servers.
   # Läuft im Host-Netz, damit es den echten Traffic aller Netzwerkkarten sieht.
   # Eigene Detail-Ansicht: http://<SERVER-IP>:61208
+  #
+  # Nur aktiv mit COMPOSE_PROFILES=glances in der .env. Auf Proxmox läuft
+  # Glances stattdessen direkt auf dem Host (siehe proxmox-install.sh), denn
+  # hier im Container würde es nur den Container messen.
   glances:
     image: nicolargo/glances:latest
     container_name: glances
+    profiles: ["glances"]
     restart: unless-stopped
     pid: host
     network_mode: host
