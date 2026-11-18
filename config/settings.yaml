@@ -35,6 +35,10 @@ layout:
     icon: mdi-server
     style: row
     columns: 3
+  Proxmox-Gäste:
+    icon: mdi-cube-outline
+    style: row
+    columns: 4
   Meine Dienste:
     icon: mdi-apps
     style: row

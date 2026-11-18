@@ -9,6 +9,11 @@
 #
 # Ohne Rückfragen (z. B. für Automatisierung) lassen sich Werte vorgeben:
 #   FRITZBOX_IP=192.168.178.1 UNIFI_IP=192.168.1.1 UNIFI_KEY=... sudo -E ./setup.sh
+#
+# Auf Proxmox ruft proxmox-install.sh dieses Skript im Dashboard-Container auf
+# und gibt die Werte des Proxmox-Hosts vor (dann läuft Glances auf dem Host):
+#   GLANCES_URL NET_IFACE DISK_NAME ROOTFS
+#   PVE_URL PVE_NODE PVE_TOKEN_ID PVE_TOKEN_SECRET GUESTS_FILE
 set -euo pipefail
 cd "$(dirname "$(readlink -f "$0")")"
 
@@ -34,10 +39,11 @@ ask() {
   printf '%s' "${answer:-$default}"
 }
 
-# Wert in .env setzen (sicher auch bei Sonderzeichen)
+# Wert in .env setzen oder ergänzen (sicher auch bei Sonderzeichen)
 set_env() {
   K="$1" V="$2" awk 'BEGIN { k = ENVIRON["K"]; v = ENVIRON["V"] }
-    index($0, k "=") == 1 { print k "=" v; next } { print }' .env > .env.tmp
+    index($0, k "=") == 1 { print k "=" v; found = 1; next } { print }
+    END { if (!found) print k "=" v }' .env > .env.tmp
   mv .env.tmp .env
   chmod 600 .env  # enthält den API-Schlüssel
 }
@@ -79,14 +85,19 @@ if [ -z "$IFACE" ]; then  # Rückfall ohne "ip"-Befehl
   SRC=$(hostname -I 2>/dev/null | awk '{ print $1 }')
 fi
 [ -n "$SRC" ] || fail "Keine IP-Adresse gefunden. Ist der Server mit dem Netzwerk verbunden?"
-ok "Server-IP:     $SRC"
-ok "Netzwerkkarte: $IFACE"
-ok "Router (UDM):  ${GW:-nicht gefunden}"
 
 ROOT_SRC=$(findmnt -no SOURCE / 2>/dev/null || true)
 DISK=$(lsblk -rsno NAME,TYPE "$ROOT_SRC" 2>/dev/null | awk '$2 == "disk" { print $1; exit }' || true)
 [ -n "$DISK" ] || DISK=$(lsblk -dno NAME,TYPE 2>/dev/null | awk '$2 == "disk" && $1 !~ /^(loop|zram|ram)/ { print $1; exit }' || true)
 DISK=${DISK:-sda}
+
+# Proxmox-Modus: Netzwerkkarte und Festplatte des Hosts statt des Containers
+IFACE=${NET_IFACE:-$IFACE}
+DISK=${DISK_NAME:-$DISK}
+
+ok "Dashboard-IP:  $SRC"
+ok "Router (UDM):  ${GW:-nicht gefunden}"
+ok "Netzwerkkarte: $IFACE"
 ok "Festplatte:    $DISK"
 
 # --------------------------------------------------------------------------
@@ -153,6 +164,39 @@ set_env HOMEPAGE_VAR_DISK "$DISK"
 set_env HOMEPAGE_VAR_FRITZBOX_URL "http://$FRITZ"
 set_env HOMEPAGE_VAR_UNIFI_URL "https://$UNIFI"
 set_env HOMEPAGE_VAR_UNIFI_KEY "$UNIFI_KEY"
+if [ -n "${GLANCES_URL:-}" ]; then
+  # Glances läuft woanders (Proxmox-Host), also keinen eigenen Container starten
+  set_env COMPOSE_PROFILES ""
+  set_env HOMEPAGE_VAR_GLANCES_URL "$GLANCES_URL"
+  set_env HOMEPAGE_VAR_ROOTFS "${ROOTFS:-/}"
+else
+  set_env COMPOSE_PROFILES glances
+  set_env HOMEPAGE_VAR_GLANCES_URL "http://$SRC:61208"
+  set_env HOMEPAGE_VAR_ROOTFS /rootfs
+fi
+if [ -n "${PVE_TOKEN_ID:-}" ]; then
+  set_env HOMEPAGE_VAR_PVE_URL "$PVE_URL"
+  set_env HOMEPAGE_VAR_PVE_NODE "$PVE_NODE"
+  set_env HOMEPAGE_VAR_PVE_TOKEN_ID "$PVE_TOKEN_ID"
+  set_env HOMEPAGE_VAR_PVE_TOKEN_SECRET "$PVE_TOKEN_SECRET"
+  cat > config/proxmox.yaml <<EOF
+---
+# Automatisch erzeugt von setup.sh, die Werte stehen in der .env
+"$PVE_NODE":
+  url: "{{HOMEPAGE_VAR_PVE_URL}}"
+  token: "{{HOMEPAGE_VAR_PVE_TOKEN_ID}}"
+  secret: "{{HOMEPAGE_VAR_PVE_TOKEN_SECRET}}"
+EOF
+  ok "Proxmox-Zugang eingetragen (Knoten $PVE_NODE)"
+fi
+if [ -n "${GUESTS_FILE:-}" ] && [ -f "$GUESTS_FILE" ]; then
+  awk -v f="$GUESTS_FILE" '
+    /^# >>> proxmox-gaeste/ { print; while ((getline line < f) > 0) print line; skip = 1; next }
+    /^# <<< proxmox-gaeste/ { skip = 0 }
+    !skip { print }' config/services.yaml > config/services.yaml.tmp
+  mv config/services.yaml.tmp config/services.yaml
+  ok "Proxmox-Gäste als Kacheln eingetragen: $(grep -c 'proxmoxVMID' "$GUESTS_FILE" || true)"
+fi
 ok ".env geschrieben"
 
 # --------------------------------------------------------------------------
@@ -161,9 +205,10 @@ docker compose pull -q
 docker compose up -d --remove-orphans
 
 # CPU-Temperatursensor erkennen, sobald Glances läuft
+GL=$(get_env HOMEPAGE_VAR_GLANCES_URL)
 sensors=""
 for _ in $(seq 1 30); do
-  sensors=$(curl --noproxy '*' -s -m 2 http://127.0.0.1:61208/api/4/sensors || true)
+  sensors=$(curl --noproxy '*' -s -m 2 "$GL/api/4/sensors" || true)
   [ -n "$sensors" ] && break
   sleep 2
 done
@@ -200,6 +245,6 @@ EOF
 fi
 if [ -n "$FRITZ_HINT$UNIFI_HINT" ]; then
   echo
-  echo "  Danach einfach nochmal:  sudo ./setup.sh"
+  echo "  Danach einfach nochmal:  ${RERUN_HINT:-sudo ./setup.sh}"
 fi
 echo

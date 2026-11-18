@@ -88,7 +88,7 @@
           type: glances
           url: "{{HOMEPAGE_VAR_GLANCES_URL}}"
           version: 4
-          metric: "fs:/rootfs" # = "/" des Servers
+          metric: "fs:{{HOMEPAGE_VAR_ROOTFS}}"
 
     - Top-Prozesse:
         icon: mdi-format-list-numbered
@@ -98,14 +98,6 @@
           version: 4
           metric: process
 
-    - Docker-Container:
-        icon: mdi-docker
-        widget:
-          type: glances
-          url: "{{HOMEPAGE_VAR_GLANCES_URL}}"
-          version: 4
-          metric: containers
-
     - System:
         icon: mdi-information-outline
         widget:
@@ -114,8 +106,32 @@
           version: 4
           metric: info
 
+    - Proxmox:
+        icon: proxmox.svg
+        href: "{{HOMEPAGE_VAR_PVE_URL}}"
+        description: Laufende VMs und Container
+        widget:
+          type: proxmox
+          url: "{{HOMEPAGE_VAR_PVE_URL}}"
+          username: "{{HOMEPAGE_VAR_PVE_TOKEN_ID}}"
+          password: "{{HOMEPAGE_VAR_PVE_TOKEN_SECRET}}"
+          node: "{{HOMEPAGE_VAR_PVE_NODE}}"
+
+# --- Alle VMs und LXC-Container von Proxmox ----------------------------------
+# Der Block zwischen den Markierungen wird von proxmox-install.sh automatisch
+# erzeugt (neue VM angelegt? Skript einfach nochmal ausführen).
+# Änderungen bitte außerhalb der Markierungen machen.
+# >>> proxmox-gaeste
+# <<< proxmox-gaeste
+
 # --- Deine Dienste: ein Klick auf die Kachel öffnet den Dienst ---------------
 - Meine Dienste:
+    - Proxmox VE:
+        icon: proxmox.svg
+        href: "{{HOMEPAGE_VAR_PVE_URL}}"
+        description: VMs und Container verwalten
+        siteMonitor: "{{HOMEPAGE_VAR_PVE_URL}}"
+
     - FRITZ!Box:
         icon: fritzbox.svg
         href: "{{HOMEPAGE_VAR_FRITZBOX_URL}}"
@@ -130,10 +146,9 @@
 
     - Glances:
         icon: glances.svg
-        href: "http://{{HOMEPAGE_VAR_SERVER_IP}}:61208"
+        href: "{{HOMEPAGE_VAR_GLANCES_URL}}"
         description: Alle Server-Messwerte im Detail
-        server: lokal
-        container: glances
+        siteMonitor: "{{HOMEPAGE_VAR_GLANCES_URL}}"
 
     # ---------------------------------------------------------------------
     # Vorlage für weitere Dienste: Block kopieren, "#" entfernen, anpassen.
