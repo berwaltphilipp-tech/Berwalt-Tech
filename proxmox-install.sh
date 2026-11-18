@@ -252,7 +252,8 @@ probe_url() {  # $1 = IP, $2 = Programmname
     adguard-home) cands="http:80 http:3000" ;;
     nextcloud|vaultwarden|truenas|openmediavault|omv) cands="https:443 http:80" ;;
     immich) cands="http:2283" ;;
-    paperless*) cands="http:8000" ;;
+    paperless*) cands="http:8000 http:8010" ;;
+    wireguard|wg-easy) cands="http:51821" ;;
     portainer|docker*) cands="https:9443 http:9000" ;;
     nginx-proxy-manager) cands="http:81" ;;
     uptime-kuma|uptimekuma) cands="http:3001" ;;
@@ -289,7 +290,8 @@ probe_url() {  # $1 = IP, $2 = Programmname
       code2=$(curl --noproxy '*' -sk -o /dev/null --connect-timeout 2 -m 4 -w '%{http_code}' "https://$ip:$port$path" 2>/dev/null || true)
       [ -n "$code2" ] && [ "$code2" != 000 ] && proto=https && code=$code2
     fi
-    if [ -n "$code" ] && [ "$code" != 000 ]; then
+    # 000 = keine Antwort, 404 = Server ohne Weboberfläche (z. B. reine APIs/MCP-Server)
+    if [ -n "$code" ] && [ "$code" != 000 ] && [ "$code" != 404 ]; then
       url="$proto://$ip"
       case "$proto:$port" in http:80|https:443) ;; *) url="$url:$port" ;; esac
       printf '%s' "$url$path"
@@ -339,28 +341,43 @@ while read -r id type state name <&3; do
   fi
   if [ "$type" = qemu ]; then kind=VM; else kind=LXC; fi
 
+  gip="" desc=""
   url=$(notes_url "$id" "$type"); how="aus der Proxmox-Notiz"
   if [ -z "$url" ] && [ "$id" = "$CTID" ]; then  # das Dashboard selbst
     url="http://$CT_IP:3000"; how="dieses Dashboard"
+  fi
+  if [ -z "$url" ]; then  # Programme, die online verwaltet werden
+    case "$lname" in
+      tailscale*) url="https://login.tailscale.com/admin/machines"; desc="Verwaltung bei Tailscale" ;;
+      cloudflared*|cloudflare*) url="https://one.dash.cloudflare.com/"; desc="Verwaltung bei Cloudflare" ;;
+      netbird*) url="https://app.netbird.io/"; desc="Verwaltung bei NetBird" ;;
+    esac
+    how="Online-Verwaltung"
   fi
   if [ -z "$url" ] && [ "$state" = running ]; then
     gip=$(guest_ip "$id" "$type")
     if [ -n "$gip" ]; then url=$(probe_url "$gip" "$lname"); how="automatisch gefunden"; fi
   fi
-  if [ -z "$url" ]; then
+  # Gespeicherte Adresse nur, wenn gerade nichts geprüft werden konnte (Gast aus
+  # oder IP unbekannt); läuft der Gast und hat keine Weboberfläche, gilt sie nicht mehr.
+  if [ -z "$url" ] && [ -z "$gip" ]; then
     url=$(awk -v id="$id" '$1 == id { print $2 }' "$CACHE"); how="zuletzt gefunden"
   fi
 
   if [ -n "$url" ]; then
     echo "$id $url" >> "$TMP/cache.new"
     href=$url
-    desc="${url#*://}"
+    desc=${desc:-${url#*://}}
     printf '  ✓ %-20s → %s (%s)\n' "$label" "$url" "$how" >> "$TMP/report.txt"
   else
     href="https://$HOST_IP:8006/#v1:0:=$type%2F$id"
     desc="$kind $id"
-    if [ "$state" = running ]; then
-      printf '  ! %-20s → keine Weboberfläche gefunden, öffnet Proxmox\n' "$label" >> "$TMP/report.txt"
+    if [ "$state" = running ] && [ -n "$gip" ]; then
+      printf '  ! %-20s → läuft auf %s, aber keine Weboberfläche gefunden, öffnet Proxmox\n' "$label" "$gip" >> "$TMP/report.txt"
+    elif [ "$state" = running ] && [ "$type" = qemu ]; then
+      printf '  ! %-20s → IP-Adresse nicht gefunden (QEMU-Gast-Agent fehlt?), öffnet Proxmox\n' "$label" >> "$TMP/report.txt"
+    elif [ "$state" = running ]; then
+      printf '  ! %-20s → IP-Adresse nicht gefunden, öffnet Proxmox\n' "$label" >> "$TMP/report.txt"
     else
       printf '  - %-20s → ist aus, öffnet Proxmox\n' "$label" >> "$TMP/report.txt"
     fi
@@ -383,6 +400,11 @@ if grep -q '^  [!-]' "$TMP/report.txt"; then
   echo "  Adresse von Hand festlegen: In Proxmox die VM/den LXC anklicken -> Übersicht ->"
   echo "  Notizen -> eine Zeile wie  dashboard: http://192.168.1.20:8123  eintragen,"
   echo "  dann dieses Skript nochmal ausführen."
+  if grep -q 'Gast-Agent fehlt' "$TMP/report.txt"; then
+    echo
+    echo "  VMs ohne IP: In der VM den Gast-Agenten installieren (Debian/Ubuntu:"
+    echo "  apt install qemu-guest-agent) und in Proxmox unter Optionen -> QEMU Guest Agent aktivieren."
+  fi
 fi
 
 # UDM-Schlüssel nur abfragen, wenn im Dashboard noch keiner hinterlegt ist
