@@ -8,7 +8,7 @@ Auf einer Seite siehst du:
 | **Leiste oben** | CPU-Last, RAM, CPU-Temperatur, Betriebszeit des Proxmox-Servers, Datum/Uhrzeit, Suche |
 | **Internet & Heimnetz** | Internet-Traffic rein/raus (aktuell und gesamt) und Leitungsstatus von der FRITZ!Box, Betriebszeit und Anzahl der Geräte in LAN/WLAN von der UDM |
 | **Server** | Live-Diagramme für CPU, RAM und Netzwerk-Traffic des Proxmox-Servers, Temperatur, Festplatte (Lesen/Schreiben), Systeminfo, laufende VMs/LXCs, **alle Proxmox-Speicher** (local, local-lvm, ZFS, NAS …) mit freiem Platz und Belegung |
-| **Proxmox-Gäste** | Eine Kachel pro VM und LXC mit Status, CPU und RAM, wird automatisch erzeugt |
+| **Proxmox-Gäste** | Eine Kachel pro VM und LXC mit Status, CPU und RAM, wird automatisch erzeugt. Ein Klick öffnet **das Programm** darin (z. B. Home Assistant), nicht die VM |
 | **Meine Dienste** | Proxmox, FRITZ!Box, UniFi, Glances und deine eigenen Dienste: Klick öffnet sie, grüner Punkt = erreichbar |
 
 Für alle Details gibt es außerdem die Glances-Oberfläche unter `http://<PROXMOX-IP>:61208` und die UniFi-Oberfläche der UDM (Traffic je Gerät).
@@ -47,7 +47,7 @@ Das Skript braucht ein paar Minuten und erledigt:
 - LXC-Container `dashboard` erstellen (Debian, 2 Kerne, 1,5 GB RAM, 8 GB Speicher, startet automatisch mit)
 - darin Docker und das Dashboard installieren (`/opt/berwalt-tech`)
 - Netzwerkkarte, Festplatte, CPU-Sensor, FRITZ!Box und UDM erkennen und prüfen
-- für jede VM und jeden LXC eine Kachel anlegen
+- für jede VM und jeden LXC eine Kachel anlegen und die Weboberfläche des Programms darin suchen (siehe [Kacheln der VMs und LXCs](#kacheln-der-vms-und-lxcs))
 
 Am Ende zeigt es die Adresse des Dashboards (`http://<IP-DES-CONTAINERS>:3000`) und, falls nötig, was in FRITZ!Box oder UDM noch freizuschalten ist.
 
@@ -94,6 +94,19 @@ Das Skript prüft den Schlüssel direkt an der UDM, speichert ihn und startet da
 2. **Nur lokalen Zugriff erlauben** aktivieren und als Rolle für Network **Nur ansehen** (View Only) wählen
 3. Im Container (`pct enter <ID>`) in `/opt/berwalt-tech/.env` bei `HOMEPAGE_VAR_UNIFI_USER` / `HOMEPAGE_VAR_UNIFI_PASS` eintragen
 
+## Kacheln der VMs und LXCs
+
+Ein Klick auf eine VM- oder LXC-Kachel öffnet direkt das Programm darin. Das Skript findet die Adresse so:
+
+1. **Notiz in Proxmox:** Steht bei der VM/dem LXC unter *Übersicht → Notizen* eine Zeile wie `dashboard: http://192.168.1.20:8123`, wird genau diese Adresse benutzt.
+2. **Automatisch:** Es ermittelt die IP-Adresse (bei LXCs direkt, bei VMs über den QEMU-Gast-Agenten oder die MAC-Adresse) und sucht die Weboberfläche. Für über 40 bekannte Programme kennt es den Port (Home Assistant 8123, Jellyfin 8096, Plex, Pi-hole, Nextcloud, Immich, Paperless, Portainer, Proxmox Backup Server, *arr, …). Sonst probiert es die üblichen Web-Ports. Der Name der VM/des LXC hilft dabei, z. B. `homeassistant` oder `jellyfin`.
+3. **Zuletzt gefunden:** Ist eine VM gerade aus, bleibt die zuletzt gefundene Adresse erhalten.
+4. Findet es nichts, öffnet die Kachel die VM in Proxmox.
+
+Am Ende zeigt das Skript eine Liste, welche Kachel wohin führt. Stimmt eine Adresse nicht oder fehlt sie: Notiz eintragen (Punkt 1) und das Skript nochmal ausführen.
+
+> Läuft in einer VM mehr als ein Programm (z. B. ein Docker-Host), öffnet die Kachel das erste gefundene. Die übrigen Programme trägst du unter „Meine Dienste“ ein (siehe unten).
+
 ## Eigene Dienste hinzufügen
 
 Die Dateien liegen im Container `dashboard` unter `/opt/berwalt-tech`. Hineinkommen: Proxmox-Shell → `pct enter <ID>`.
@@ -102,7 +115,6 @@ Die Dateien liegen im Container `dashboard` unter `/opt/berwalt-tech`. Hineinkom
 
 > Den Block zwischen `# >>> proxmox-gaeste` und `# <<< proxmox-gaeste` nicht von Hand ändern, der wird bei jedem Lauf neu erzeugt.
 
-**Eine VM/LXC-Kachel soll direkt den Dienst öffnen statt Proxmox?** Kopiere die Kachel aus dem automatischen Block nach „Meine Dienste“ und ändere `href` auf die Adresse des Dienstes (z. B. `http://192.168.1.20:8123`). Mit `proxmoxVMID` usw. bleiben Status, CPU und RAM sichtbar.
 
 **Variante B: automatisch per Docker-Label** (für Container, die im Dashboard-LXC laufen):
 
@@ -152,7 +164,7 @@ In der Proxmox-Shell:
 pct stop <ID> && pct destroy <ID>
 ```
 ```bash
-systemctl disable --now glances && rm -rf /opt/glances /etc/glances /etc/systemd/system/glances.service
+systemctl disable --now glances && rm -rf /opt/glances /etc/glances /etc/systemd/system/glances.service /etc/berwalt-dashboard
 ```
 ```bash
 pveum user delete homepage@pve
