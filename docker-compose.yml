@@ -1,0 +1,55 @@
+# Berwalt-Tech Dashboard
+# Start:  docker compose up -d
+# Danach: http://<SERVER-IP>:3000
+#
+# Vorher einmalig:  cp .env.example .env   (und Werte darin anpassen)
+
+services:
+  # Das eigentliche Dashboard (https://gethomepage.dev)
+  homepage:
+    image: ghcr.io/gethomepage/homepage:latest
+    container_name: homepage
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    env_file: .env
+    volumes:
+      - ./config:/app/config
+      - ./images:/app/public/images
+    extra_hosts:
+      # damit das Dashboard Glances (läuft im Host-Netz) erreicht
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - dockerproxy
+      - glances
+
+  # Misst CPU, RAM, Temperatur, Festplatten und den Netzwerk-Traffic des Servers.
+  # Läuft im Host-Netz, damit es den echten Traffic aller Netzwerkkarten sieht.
+  # Eigene Detail-Ansicht: http://<SERVER-IP>:61208
+  glances:
+    image: nicolargo/glances:latest
+    container_name: glances
+    restart: unless-stopped
+    pid: host
+    network_mode: host
+    environment:
+      GLANCES_OPT: "-w"
+      TZ: ${TZ:-Europe/Berlin}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /etc/os-release:/etc/os-release:ro
+      # Host-Dateisystem nur lesend, damit der freie Speicherplatz sichtbar ist
+      - /:/rootfs:ro
+
+  # Gibt dem Dashboard nur Lesezugriff auf Docker (Status + Leistung je Container),
+  # statt ihm den kompletten Docker-Socket zu geben.
+  dockerproxy:
+    image: ghcr.io/tecnativa/docker-socket-proxy:latest
+    container_name: dockerproxy
+    restart: unless-stopped
+    environment:
+      CONTAINERS: 1
+      POST: 0
+      DISABLE_IPV6: 1 # verhindert Absturz auf Systemen ohne IPv6
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro

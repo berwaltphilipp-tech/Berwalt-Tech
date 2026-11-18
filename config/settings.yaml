@@ -1,0 +1,41 @@
+---
+# Alle Optionen: https://gethomepage.dev/configs/settings/
+
+title: Berwalt-Tech
+description: Server-Dashboard
+language: de
+
+theme: dark
+color: slate
+headerStyle: boxedWidgets
+cardStyle: hairline
+blockStyle: refined
+statusStyle: dot
+target: _blank
+
+background:
+  image: /images/background.jpg
+  opacity: 60
+cardBlur: md
+
+# Zeigt CPU / RAM / Netzwerk jedes Docker-Containers direkt auf seiner Kachel
+showStats: true
+
+# Einfach auf dem Dashboard lostippen, um einen Dienst zu suchen und zu öffnen
+quicklaunch:
+  searchDescriptions: true
+  provider: duckduckgo
+
+layout:
+  Server-Leistung:
+    icon: mdi-server
+    style: row
+    columns: 3
+  Netzwerk & Traffic:
+    icon: mdi-swap-vertical-bold
+    style: row
+    columns: 3
+  Meine Dienste:
+    icon: mdi-apps
+    style: row
+    columns: 4

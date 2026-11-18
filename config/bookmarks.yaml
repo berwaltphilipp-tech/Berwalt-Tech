@@ -1,0 +1,10 @@
+---
+# Lesezeichen unten auf der Seite. Mehr: https://gethomepage.dev/configs/bookmarks/
+
+- Hilfe:
+    - Homepage-Doku:
+        - abbr: HP
+          href: https://gethomepage.dev/
+    - Dashboard-Icons:
+        - abbr: IC
+          href: https://dashboardicons.com/

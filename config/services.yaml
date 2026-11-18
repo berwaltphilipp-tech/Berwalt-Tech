@@ -1,0 +1,132 @@
+---
+# Kacheln des Dashboards. Alle Optionen: https://gethomepage.dev/configs/services/
+# Platzhalter wie {{HOMEPAGE_VAR_...}} werden aus der Datei .env gefüllt.
+
+# --- Live-Diagramme zur Leistung des Servers --------------------------------
+- Server-Leistung:
+    - CPU-Auslastung:
+        icon: mdi-cpu-64-bit
+        widget:
+          type: glances
+          url: "{{HOMEPAGE_VAR_GLANCES_URL}}"
+          version: 4
+          metric: cpu
+          chartMax: 100
+
+    - Arbeitsspeicher (RAM):
+        icon: mdi-memory
+        widget:
+          type: glances
+          url: "{{HOMEPAGE_VAR_GLANCES_URL}}"
+          version: 4
+          metric: memory
+
+    - CPU-Temperatur:
+        icon: mdi-thermometer
+        widget:
+          type: glances
+          url: "{{HOMEPAGE_VAR_GLANCES_URL}}"
+          version: 4
+          metric: "sensor:{{HOMEPAGE_VAR_CPU_SENSOR}}"
+
+    - Top-Prozesse:
+        icon: mdi-format-list-numbered
+        widget:
+          type: glances
+          url: "{{HOMEPAGE_VAR_GLANCES_URL}}"
+          version: 4
+          metric: process
+
+    - Docker-Container:
+        icon: mdi-docker
+        widget:
+          type: glances
+          url: "{{HOMEPAGE_VAR_GLANCES_URL}}"
+          version: 4
+          metric: containers
+
+    - System:
+        icon: mdi-information-outline
+        widget:
+          type: glances
+          url: "{{HOMEPAGE_VAR_GLANCES_URL}}"
+          version: 4
+          metric: info
+
+# --- Traffic rein / raus ----------------------------------------------------
+- Netzwerk & Traffic:
+    - Server-Traffic:
+        icon: mdi-swap-vertical
+        description: Netzwerkkarte des Servers
+        widget:
+          type: glances
+          url: "{{HOMEPAGE_VAR_GLANCES_URL}}"
+          version: 4
+          metric: "network:{{HOMEPAGE_VAR_NET_IFACE}}"
+
+    - Internet-Traffic:
+        icon: fritzbox.svg
+        href: "{{HOMEPAGE_VAR_FRITZBOX_URL}}"
+        description: Gesamter Haushalt über die FRITZ!Box
+        widget:
+          type: fritzbox
+          url: "{{HOMEPAGE_VAR_FRITZBOX_URL}}"
+          fields: ["down", "up", "received", "sent"]
+
+    - Internet-Verbindung:
+        icon: mdi-web
+        href: "{{HOMEPAGE_VAR_FRITZBOX_URL}}"
+        widget:
+          type: fritzbox
+          url: "{{HOMEPAGE_VAR_FRITZBOX_URL}}"
+          fields: ["connectionStatus", "uptime", "maxDown", "maxUp"]
+
+    - Festplatte lesen/schreiben:
+        icon: mdi-harddisk
+        widget:
+          type: glances
+          url: "{{HOMEPAGE_VAR_GLANCES_URL}}"
+          version: 4
+          metric: "disk:{{HOMEPAGE_VAR_DISK}}"
+
+    - Speicherplatz:
+        icon: mdi-database
+        widget:
+          type: glances
+          url: "{{HOMEPAGE_VAR_GLANCES_URL}}"
+          version: 4
+          metric: "fs:/rootfs" # = "/" des Servers
+
+# --- Deine Dienste: ein Klick auf die Kachel öffnet den Dienst ---------------
+- Meine Dienste:
+    - FRITZ!Box:
+        icon: fritzbox.svg
+        href: "{{HOMEPAGE_VAR_FRITZBOX_URL}}"
+        description: Router-Oberfläche
+        siteMonitor: "{{HOMEPAGE_VAR_FRITZBOX_URL}}"
+
+    - Glances:
+        icon: glances.svg
+        href: "http://{{HOMEPAGE_VAR_SERVER_IP}}:61208"
+        description: Alle Messwerte im Detail
+        server: lokal
+        container: glances
+
+    # ---------------------------------------------------------------------
+    # Vorlage für weitere Dienste: Block kopieren, "#" entfernen, anpassen.
+    #   icon:       Name von https://dashboardicons.com (z. B. jellyfin.svg)
+    #   href:       Adresse, die beim Klick geöffnet wird
+    #   container:  Name des Docker-Containers (zeigt Status + CPU/RAM/Traffic)
+    # ---------------------------------------------------------------------
+    # - Portainer:
+    #     icon: portainer.svg
+    #     href: "http://{{HOMEPAGE_VAR_SERVER_IP}}:9443"
+    #     description: Docker verwalten
+    #     server: lokal
+    #     container: portainer
+    #
+    # - Home Assistant:
+    #     icon: home-assistant.svg
+    #     href: "http://{{HOMEPAGE_VAR_SERVER_IP}}:8123"
+    #     description: Smart Home
+    #     siteMonitor: "http://{{HOMEPAGE_VAR_SERVER_IP}}:8123"
