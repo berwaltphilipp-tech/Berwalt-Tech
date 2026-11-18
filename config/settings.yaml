@@ -27,12 +27,12 @@ quicklaunch:
   provider: duckduckgo
 
 layout:
-  Server-Leistung:
-    icon: mdi-server
+  Internet & Heimnetz:
+    icon: mdi-swap-vertical-bold
     style: row
     columns: 3
-  Netzwerk & Traffic:
-    icon: mdi-swap-vertical-bold
+  Server:
+    icon: mdi-server
     style: row
     columns: 3
   Meine Dienste:
